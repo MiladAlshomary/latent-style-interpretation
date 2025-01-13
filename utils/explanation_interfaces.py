@@ -1,6 +1,6 @@
 exp_interface_1="""
 <p><strong>The Mystery Author can be described as having the following styles:</strong></p>
-<p><strong>For each style, we show how much it applies for each of the candidate authors</strong></p>
+<p><strong>For each style, we show how much it applies for each of the candidate authors (higher score == more applicability and lower numbers == less applicability)</strong></p>
 <p><strong>Style 1:</strong></p>
 <p><span style="font-size: 16px; font-family: Helvetica;"><em>[style-1]</em></span></p>
 <p><strong>Style 2:</strong></p>
@@ -47,12 +47,18 @@ exp_interface_1="""
 
 exp_interface_1_1="""
 <p><strong>The Mystery Author can be described as having the following styles:</strong></p>
-<p><strong>For each style, we show how much it applies for each of the candidate authors</strong></p>
+<p><strong>For each style, we show how much it applies for each of the other candidate authors (higher score == more applicability and lower score == less applicability)</strong>. According to this analysis, our AI model made the recommendation below</p>
 <p><strong>Style 1:</strong></p>
 <p><span style="font-size: 16px; font-family: Helvetica;"><em>[style-1]</em></span></p>
-<table style="width: 60%; background-color: rgb(209, 209, 209);border: none;">
+<table style="width: 80%; background-color: rgb(209, 209, 209);border: none;">
     <tbody>
         <tr>
+            <td style="width: 15%;">
+                <div style="text-align: center;"><strong>Mystery Author</strong></div>
+            </td>
+            <td style="width: 5%;">
+                <div style="text-align: left;">[query-author-style-1]</div>
+            </td>
             <td style="width: 15%;">
                 <div style="text-align: center;"><strong>Author 1</strong></div>
             </td>
@@ -80,9 +86,15 @@ exp_interface_1_1="""
 <p><strong>Style 2:</strong></p>
 <p><span style="font-size: 16px; font-family: Helvetica;"><em>[style-2]</em></span></p>
 
-<table style="width: 60%; background-color: rgb(209, 209, 209);border: none;">
+<table style="width: 80%; background-color: rgb(209, 209, 209);border: none;">
     <tbody>
         <tr>
+            <td style="width: 15%;">
+                <div style="text-align: center;"><strong>Mystery Author</strong></div>
+            </td>
+            <td style="width: 5%;">
+                <div style="text-align: left;">[query-author-style-2]</div>
+            </td>
             <td style="width: 15%;">
                 <div style="text-align: center;"><strong>Author 1</strong></div>
             </td>
@@ -108,9 +120,15 @@ exp_interface_1_1="""
 
 <p><strong>Style 3:</strong></p>
 <p><span style="font-size: 16px; font-family: Helvetica;"><em>[style-3]</em></span></p>
-<table style="width: 60%; background-color: rgb(209, 209, 209);border: none;">
+<table style="width: 80%; background-color: rgb(209, 209, 209);border: none;">
     <tbody>
         <tr>
+            <td style="width: 15%;">
+                <div style="text-align: center;"><strong>Mystery Author</strong></div>
+            </td>
+            <td style="width: 5%;">
+                <div style="text-align: left;">[query-author-style-3]</div>
+            </td>
             <td style="width: 15%;">
                 <div style="text-align: center;"><strong>Author 1</strong></div>
             </td>
@@ -139,7 +157,8 @@ exp_interface_1_1="""
 ###########################################
 
 exp_interface_2="""
-<p><strong>The following presents a selection of writing style features our system identified in the texts and how much they apply for each of the authors</strong>(lighter color == high resemblance and darker color == low resemblance)</p>
+<p><strong>The following is a selection of writing style features our system identified in the text and how much they apply for each of the authors</strong> (darker green == the feature strongly applies in the author's text, and lighter green == the feature applies less in the author's text)</p>
+Similar authors have similar applicability across various writing style features. In other words, their columns will have a similar color pattern across the different style features. According to this analysis, our AI model made the recommendation below
 <p><br></p>
 <table style='"width:70%";'>
     <tbody>

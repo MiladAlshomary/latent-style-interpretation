@@ -18,6 +18,7 @@ from aa_models import get_model
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import minmax_scale
+from scipy.stats import zscore
 
 
 
@@ -60,7 +61,7 @@ def main(args):
     #'../data/explainability/clusterd_authors_with_style_description.pkl'
     interpretable_space = pkl.load(open(args['inter_path'], 'rb'))
     del interpretable_space[-1] #DBSCAN generate a cluster -1 of all outliers. We don't want this cluster
-    print("# clusters:", len(interpretable_space))
+    #print("# clusters:", len(interpretable_space))
     dimension_to_latent = {key: interpretable_space[key][0] for key in interpretable_space}
     dimension_to_style  = {key: interpretable_space[key][1] for key in interpretable_space}
 
@@ -92,7 +93,7 @@ def get_documents_style_descriptions(documents, model_path, interp_space_path, i
     #'../data/explainability/clusterd_authors_with_style_description.pkl'
     interpretable_space = pkl.load(open(interp_space_path, 'rb'))
     del interpretable_space[-1] #DBSCAN generate a cluster -1 of all outliers. We don't want this cluster
-    print("# clusters:", len(interpretable_space))
+    #print("# clusters:", len(interpretable_space))
     dimension_to_latent = {key: interpretable_space[key][0] for key in interpretable_space}
     
     #Load interp space representations
@@ -132,7 +133,7 @@ def get_documents_rep_vectors(documents, model_path, interp_space_path):
     
     interpretable_space = pkl.load(open(interp_space_path, 'rb'))
     del interpretable_space[-1] #DBSCAN generate a cluster -1 of all outliers. We don't want this cluster
-    print("# clusters:", len(interpretable_space))
+    #print("# clusters:", len(interpretable_space))
 
     
     dimension_to_latent = {key: interpretable_space[key][0] for key in interpretable_space}
@@ -145,65 +146,19 @@ def get_documents_rep_vectors(documents, model_path, interp_space_path):
 
     return documents_latent, documents_interp
     
-def explain_model_prediction(model_path, inter_space_path, query_document, candidate_documents, top_c=3, top_k=5):
+def get_explainable_clusters(query_interp, candidates_interps, predicted_author_idx=None, num_clusters=3, method=1):
 
-    #load ta2 model
-    model = get_model(model_path)
+    if method == 1:
+        return np.argsort(query_interp)[::-1][:num_clusters]
     
-    #load interpretable_space and compute projection matrix
-    interpretable_space = pkl.load(open(inter_space_path, 'rb'))
-    del interpretable_space[-1] #DBSCAN generate a cluster -1 of all outliers. We don't want this cluster
-    print("# clusters:", len(interpretable_space))
-    dimension_to_latent = {key: interpretable_space[key][0] for key in interpretable_space}
-    dimension_to_style  = {key: [f[0] for f in sorted(interpretable_space[key][1].items(), key=lambda x: -x[1])] for key in interpretable_space}
-    dimension_to_style_summary  = {key: interpretable_space[key][2] for key in interpretable_space}
-    proj_matrix = np.array(list(dimension_to_latent.values()))
-    proj_matrix = normalize(proj_matrix, axis=1, norm='l2')
-
-    # Compute latent and interpretable vectors for query and candidate documents
-    documents_latent = model.encode([query_document] + candidate_documents)
-    documents_interp  = [proj_matrix.dot(e) for e in documents_latent]
-
-    # Compute Model's latent and interp prediction
-    latent_similarities = cosine_similarity(documents_latent[:1], documents_latent[1:])
-    interp_similarities = cosine_similarity(documents_interp[:1], documents_interp[1:])
-    model_latent_rank = np.argsort(latent_similarities[0])[::-1]
-    model_interp_rank = np.argsort(interp_similarities[0])[::-1]
-
-    #### Explanation #####
-
-    # Find cluster assignment for the query and candidate documents
-    query_cluster_assignments = documents_interp[0].tolist()
-    query_cluster_rankings    = np.argsort(query_cluster_assignments)[::-1]
-
-    candidate_cluster_assignments = [interp.tolist() for interp in documents_interp[1:]]
-    candidate_cluster_rankings    = [np.argsort(ass)[::-1] for ass in candidate_cluster_assignments]
-
-    # Extract the style descriptions of top_c clusters similar to the query document
-    query_style_reps = [dimension_to_style[cidx][:top_k] for cidx in query_cluster_rankings[:top_c]]
-    query_style_reps_summ = [dimension_to_style_summary[cidx] for cidx in query_cluster_rankings[:top_c]]
-
-    # Compute how similar the candidate documents to these top_c clusters
-    candidates_distance_to_query_rep = [[c_assignment[cidx] for cidx in query_cluster_rankings[:top_c]]
-        for c_assignment in candidate_cluster_assignments]
+    elif method == 2:
+        # Here, we look at how similar each candidate to the query wrt each cluster (query_doc - x) and then compute a z-score
+        # reflecting how different this similarity compared to the other candidates, and then take the clusters that distinguish the 
+        # predicted author from the other candidates by being much closer to the query author.
+        authors_diffs = [abs(query_interp - x) for x in candidates_interps]
+        res = zscore(authors_diffs, axis=0)
+        return np.argsort(res[predicted_author_idx])[:num_clusters]
     
-    #candidate_query_cluster_overlap  = [set(query_cluster_rankings[:top_c]).intersection(set(x[:top_c])) for x in candidate_cluster_rankings]
-    #candidates_distance_to_query_rep = [[c_assignment[cidx] for cidx in query_cluster_rankings[:top_c]]
-    #    for c_assignment in candidate_cluster_assignments]
-
-    # candidates_similarity_to_query = [
-    #     {
-    #         'num_shared_clusters': len(shared_clusters),
-    #         'shared_clusters': shared_clusters,
-    #         'dist_to_query_rep': candidates_distance_to_query_rep[i],
-    #         'shared_feats': [f for c_id in shared_clusters for f in dimension_to_style[c_id][:top_k]]
-    #     }
-    #     for i, shared_clusters in enumerate(candidate_query_cluster_overlap)
-    # ]
-    
-    
-    return model_latent_rank, model_interp_rank, query_style_reps, query_style_reps_summ, candidates_distance_to_query_rep
-
 def explain_model_prediction_over_author(model_path, inter_space_path, inter_space_rep_path, query_author, candidate_authors, top_c=3, top_k=5, style_feat_clm='tfidf_rep_5', cluster_lvl=True, style_feat_summary_clm=None):
 
     #load ta2 model
@@ -223,7 +178,7 @@ def explain_model_prediction_over_author(model_path, inter_space_path, inter_spa
         dimension_to_style_summary  = {x[0]: x[1] for x in zip(interpretable_space_rep_df.cluster_label.tolist(), interpretable_space_rep_df[style_feat_summary_clm].tolist())}
     
     del interpretable_space[-1] #DBSCAN generate a cluster -1 of all outliers. We don't want this cluster
-    print("# clusters:", len(interpretable_space))
+    #print("# clusters:", len(interpretable_space))
     dimension_to_latent = {key: interpretable_space[key][0] for key in interpretable_space}
     
     proj_matrix = np.array(list(dimension_to_latent.values()))
@@ -242,13 +197,8 @@ def explain_model_prediction_over_author(model_path, inter_space_path, inter_spa
     c_author_latent_avgs = [np.mean(x, axis=0) for x in c_author_latents]
     c_author_interp_avgs = [np.mean(x, axis=0) for x in c_author_interps]
     
-    # Compute Model's latent and interp prediction
-    latent_similarities = [np.mean(cosine_similarity(q_author_latents, c_latent)) for c_latent in c_author_latents]
-    interp_similarities = [np.mean(cosine_similarity(q_author_interps, c_interp)) for c_interp in c_author_interps]
     
-    model_latent_rank = np.argsort(latent_similarities)[::-1]
-    model_interp_rank = np.argsort(interp_similarities)[::-1]
-
+    
     #find most representative document of the query author
     q_cos_sim = cosine_similarity([q_author_latent_avg], q_author_latents)
     q_author_rep_document = np.argmax(q_cos_sim)
@@ -257,50 +207,89 @@ def explain_model_prediction_over_author(model_path, inter_space_path, inter_spa
     c_cos_sims = [cosine_similarity([c_author[0]], c_author[1]) for c_author in zip(c_author_latent_avgs, c_author_latents)]
     c_author_rep_documents = [np.argmax(x) for x in c_cos_sims]
     
+
+    # Compute Model's latent and interp prediction as the pairwise cosine similarity over their documents' representations
+    # latent_similarities = [np.mean(cosine_similarity(q_author_latents, c_latent)) for c_latent in c_author_latents]
+    # interp_similarities = [np.mean(cosine_similarity(q_author_interps, c_interp)) for c_interp in c_author_interps]
+    # model_latent_rank = np.argsort(latent_similarities)[::-1]
+    # model_interp_rank = np.argsort(interp_similarities)[::-1]
+
+    # Compute Model's latent and interp prediction as the cosine similarity over their most representative documents
+    # latent_similarities = [np.mean(cosine_similarity([q_author_latents[q_author_rep_document]], [c_latent[c_author_rep_documents[i]]])) for i, c_latent in enumerate(c_author_latents)]
+    # interp_similarities = [np.mean(cosine_similarity([q_author_interps[q_author_rep_document]], [c_interp[c_author_rep_documents[i]]])) for i, c_interp in enumerate(c_author_interps)]
+    # model_latent_rank = np.argsort(latent_similarities)[::-1]
+    # model_interp_rank = np.argsort(interp_similarities)[::-1]
+    
+    # Compute Model's latent and interp prediction as the cosine similarity over their average representations
+    latent_similarities = cosine_similarity([q_author_latent_avg], c_author_latent_avgs)[0]
+    interp_similarities = cosine_similarity([q_author_interp_avg], c_author_interp_avgs)[0]
+    model_latent_rank = np.argsort(latent_similarities)[::-1]
+    model_interp_rank = np.argsort(interp_similarities)[::-1]
+    
+    # print(latent_similarities, interp_similarities)
+    # print(model_latent_rank, model_interp_rank)
+    # print()
+    
     #### Explanation #########
 
-    # For now we will take the most representative document of each author to be the ones to explain => we need to figure out a way 
-    # to explain all documents
-    q_rep_document_interp = q_author_interps[q_author_rep_document]
-    c_rep_document_interp = [c_author_interps[i][idx] for i, idx in enumerate(c_author_rep_documents)]
+    #q_rep_document_interp = q_author_interps[q_author_rep_document]
+    #c_rep_document_interp = [c_author_interps[i][idx] for i, idx in enumerate(c_author_rep_documents)]
+    q_rep_document_interp = q_author_interp_avg
+    c_rep_document_interp = c_author_interp_avgs
+
+    predicted_author = model_interp_rank[0]
     
     # For explainability we rescale the cosine similarity from [-1,+1] to [0,2]
-    q_rep_document_interp = (q_rep_document_interp + 1)/2
-    c_rep_document_interp = [(x + 1)/2 for x in c_rep_document_interp]
+    # q_rep_document_interp = (q_rep_document_interp + 1)/2
+    # c_rep_document_interp = [(x + 1)/2 for x in c_rep_document_interp]
         
     if cluster_lvl:        
         # Find cluster assignment for the query and candidate documents
         query_cluster_assignments = q_rep_document_interp.tolist()
-        query_cluster_rankings    = np.argsort(query_cluster_assignments)[::-1]
+        #query_cluster_rankings    = np.argsort(query_cluster_assignments)[::-1]
         
         candidate_cluster_assignments = [interp.tolist() for interp in c_rep_document_interp]
-        candidate_cluster_rankings    = [np.argsort(ass)[::-1] for ass in candidate_cluster_assignments]
-    
-        # Extract the style descriptions of top_c clusters similar to the query document
-        query_style_reps = [dimension_to_style[cidx][:top_k] for cidx in query_cluster_rankings[:top_c]]
-        query_style_reps_summ = [dimension_to_style_summary[cidx] for cidx in query_cluster_rankings[:top_c]]
-    
-        # Compute how similar the candidate documents to these top_c clusters
-        candidates_distance_to_query_rep = [[c_assignment[cidx] for cidx in query_cluster_rankings[:top_c]]
-            for c_assignment in candidate_cluster_assignments]
+        #candidate_cluster_rankings    = [np.argsort(ass)[::-1] for ass in candidate_cluster_assignments]
 
-        return model_latent_rank, model_interp_rank, query_style_reps, query_style_reps_summ, candidates_distance_to_query_rep, q_author_rep_document, c_author_rep_documents
+        # Find the clusters to present as explanations, either method 1 (top similar clusters to the query) or method 2 (using z-score)
+        rep_clusters = get_explainable_clusters(q_rep_document_interp, c_rep_document_interp, predicted_author, num_clusters=3, method=2)
+        #print(rep_clusters)
+        
+        cluster_style_reps = [dimension_to_style[cidx][:top_k] for cidx in rep_clusters]
+        cluster_style_reps_summ = [dimension_to_style_summary[cidx] for cidx in rep_clusters]
+        
+        # Compute how similar the candidate documents to these top_c clusters
+        author_distance_to_clusters = [[author[cidx] for cidx in rep_clusters]
+            for author in  [query_cluster_assignments] + candidate_cluster_assignments]
+
+        # for i, arr in enumerate(candidates_distance_to_clusters):
+        #     print(arr)
+        
+        return model_latent_rank, model_interp_rank, cluster_style_reps, cluster_style_reps_summ, author_distance_to_clusters, q_author_rep_document, c_author_rep_documents
     else:
         # Get a ranked list of style features for all documents based on thir similarity to clusters
-        documents_feats = find_ranked_style_feats_for_documents([q_rep_document_interp] + c_rep_document_interp, dimension_to_style, all_style_feats)
-        
-        return model_latent_rank, model_interp_rank, documents_feats[0],  documents_feats[1:], q_author_rep_document, c_author_rep_documents
+        documents_feats, selected_feats_idxs = find_ranked_style_feats_for_documents([q_rep_document_interp] + c_rep_document_interp, dimension_to_style, all_style_feats, predicted_author)
+
+        selected_feats = {all_style_feats[f_idx]: f_idx for f_idx in selected_feats_idxs}
+        return model_latent_rank, model_interp_rank, documents_feats[0],  documents_feats[1:], selected_feats,  q_author_rep_document, c_author_rep_documents
     
 
-def find_ranked_style_feats_for_documents(document_interps, dimension_to_style, style_feats):
+def find_ranked_style_feats_for_documents(document_interps, dimension_to_style, style_feats, predicted_author_idx, num_feats=10):
     documents_cluster_assignments = [interp.tolist() for interp in document_interps]
-
-    documents_feats = []
+    
+    documents_feats_weights = []
     for document_cluster_assignments in documents_cluster_assignments:
         feature_weights = [np.mean([(cluster_sim * dimension_to_style[cluster_id][f]) if f in dimension_to_style[cluster_id] else 0 for cluster_id, cluster_sim in enumerate(document_cluster_assignments)]) for f in style_feats]
-        documents_feats.append({x[0]: x[1] for x in zip(style_feats, feature_weights)})
+        #documents_feats.append({x[0]: x[1] for x in zip(style_feats, feature_weights)})
+        documents_feats_weights.append(np.array(feature_weights))
 
-    return documents_feats
+    query_feats = documents_feats_weights[0]
+    # Find features that distinguish predicted author from other candidates
+    authors_diffs = np.array([abs(query_feats - x) for x in documents_feats_weights[1:]])
+    authors_diffs = authors_diffs[:,0,:] if len(authors_diffs.shape) > 2 else authors_diffs # for some reason we are getting an array of 3 dimensions
+    res = zscore(authors_diffs, axis=0)
+    selected_feats = np.argsort(res[predicted_author_idx])[:num_feats]
+    return documents_feats_weights, selected_feats
             
     
 def document_to_cluster_assignment(model, proj_matrix, documents):

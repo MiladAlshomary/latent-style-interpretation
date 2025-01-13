@@ -1,19 +1,21 @@
 import numpy as np
-
+import os
 from transformers import AutoModel, AutoTokenizer
 
 
 class LUAR_MUD:
     def __init__(self) -> None:
+        base_model_path = os.environ.get("LORA_BASEMODEL_CHECKPOINT_PATH", "rrivera1849/LUAR-MUD")
+        #print('base model', base_model_path)
         self.tokenizer = AutoTokenizer.from_pretrained(
-            "rrivera1849/LUAR-MUD", trust_remote_code=True
+            base_model_path, trust_remote_code=True
         )
         self.model = AutoModel.from_pretrained(
-            "rrivera1849/LUAR-MUD",
+            base_model_path,
             trust_remote_code=True,
         )
 
-    def encode(self, sentences, batch_size, convert_to_numpy=True, max_length=512):
+    def encode(self, sentences, batch_size=8, convert_to_numpy=True, max_length=512):
         """
         Wrapper
         """

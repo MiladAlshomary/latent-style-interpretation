@@ -4,7 +4,6 @@ import sys
 import numpy as np
 import pandas as pd
 
-
 def get_model(model, device=None, model_path=None):
     current_dir = os.path.dirname(__file__)
 
@@ -36,10 +35,13 @@ def get_model(model, device=None, model_path=None):
         from styledistance import StyleDistance
 
         return StyleDistance()
-    else:
+    elif model == "semantic_model":
         from semantic_model import SemanticModel
 
         return SemanticModel(model_path)
+    else:
+        print('Model is not identified .....')
+        return None
 
 
 ##################

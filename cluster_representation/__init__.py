@@ -6,8 +6,16 @@ import pandas as pd
 import numpy as np
 import math
 from collections import Counter, defaultdict
+from styles import StyleGenerator
 
 
+def summarize_style_feats(list_of_feats_list):
+    style_generator = StyleGenerator(model_name="openai:gpt-3.5-turbo", device=0, max_new_tokens=100)
+    print('Summarizing styles of interpretable dimensions')
+    rep_summary_df = style_generator.summarize_sentences(list_of_feats_list, 'to_concise_paragraph')
+    rep_summary = rep_summary_df.generations.tolist()
+    return rep_summary
+    
 def get_style_feats_distribution(documentIDs, style_feats_dict):
     style_feats = []
     for documentId in documentIDs:
@@ -78,38 +86,49 @@ def generate_interpretable_space_contra_representation(interp_space_path, styles
 
     style_features, labels = zip(*cluster_feats)
     labels = np.array(labels)
+    print(style_features)
     solution = get_contrastive_cluster_representation(style_features, labels, k=num_feats, la=0.1, verbose=False)
 
+        
     clusterd_df[output_clm] = clusterd_df.cluster_label.apply(lambda c_lable: [x[0] for x in solution[c_lable+1]])
 
     if summarize_with_gpt:
-        clusterd_df[output_clm] = clusterd_df[output_clm].apply(lambda feats: style_generator.summarize_sentences([top_k_feats], 'to_concise_paragraph')[0])
-        
+        print(clusterd_df[output_clm].tolist()[:3])
+        summarized_feats = summarize_style_feats(clusterd_df[output_clm].tolist())
+        clusterd_df[output_clm] = summarized_feats
+        print(clusterd_df[output_clm].tolist()[:3])
+
     return clusterd_df
 
 def generate_interpretable_space_representation(interp_space_path, styles_df_path, feat_clm, output_clm, num_feats=5, summarize_with_gpt=False):
     
     styles_df = pd.read_csv(styles_df_path)[[feat_clm, "documentID"]]
-    
+
+    # A dictionary of style features and their IDF
     style_feats_agg_df = styles_df.groupby(feat_clm).agg({'documentID': lambda x : len(list(x))}).reset_index()
     style_feats_agg_df['document_freq'] = style_feats_agg_df.documentID
-
-    #create a dictionary mapping features to their idf
+    style_to_feats_dfreq = {x[0]: math.log(styles_df.documentID.nunique()/x[1]) for x in zip(style_feats_agg_df[feat_clm].tolist(), style_feats_agg_df.document_freq.tolist())}
+    
+    # A list of style features we work with
     style_feats_list = style_feats_agg_df[feat_clm].tolist()
+    print('Number of style feats ', len(style_feats_list))
+    
+    # A list of documents and what list of style features each has
     doc_style_agg_df     = styles_df.groupby('documentID').agg({feat_clm: lambda x : list(x)}).reset_index()
     document_to_feats_dict = {x[0]: x[1] for x in zip(doc_style_agg_df.documentID.tolist(), doc_style_agg_df[feat_clm].tolist())}
-    number_documents     = styles_df.documentID.nunique()
-    style_to_feats_dfreq = {x[0]: math.log(number_documents/x[1]) for x in zip(style_feats_agg_df[feat_clm].tolist(), style_feats_agg_df.document_freq.tolist())}
+    
+    
 
+    # Load the clustering information
     df = pd.read_pickle(interp_space_path)
     df = df[df.cluster_label != -1]
+    # A cluster to list of documents
     clusterd_df = df.groupby('cluster_label').agg({
         'documentID': lambda x: [d_id for doc_ids in x for d_id in doc_ids]
     }).reset_index()
-
-    #Filter-in only documents that has a style description
+    # Filter-in only documents that has a style description
     clusterd_df['documentID'] = clusterd_df.documentID.apply(lambda documentIDs: [documentID for documentID in documentIDs if documentID in document_to_feats_dict])
-    
+    # Map from cluster label to list of features through the document information
     clusterd_df[feat_clm] = clusterd_df.documentID.apply(lambda doc_ids: [f for d_id in doc_ids for f in document_to_feats_dict[d_id]])
 
     def compute_tfidf(row):
@@ -122,19 +141,20 @@ def generate_interpretable_space_representation(interp_space_path, styles_df_pat
         
         return style_distribution
 
-    def create_tfidf_rep(tfidf_dist, num_feats, summarize_with_gpt):
+    def create_tfidf_rep(tfidf_dist, num_feats):
         style_feats = sorted(tfidf_dist.items(), key=lambda x: -x[1])
         top_k_feats = [x[0] for x in style_feats[:num_feats] if str(x[0]) != 'nan']
-        if summarize_with_gpt:
-            rep_summary_df = style_generator.summarize_sentences([top_k_feats], 'to_concise_paragraph')
-            rep_summary = rep_summary_df.generations.tolist()
-            return rep_summary[0]
-        else:
-            return top_k_feats
+        return top_k_feats
 
     clusterd_df[output_clm +'_dist'] = clusterd_df.apply(lambda row: compute_tfidf(row), axis=1)
-    clusterd_df[output_clm]         = clusterd_df[output_clm +'_dist'].apply(lambda dist: create_tfidf_rep(dist, num_feats, summarize_with_gpt))
+    clusterd_df[output_clm]         = clusterd_df[output_clm +'_dist'].apply(lambda dist: create_tfidf_rep(dist, num_feats))
 
+    if summarize_with_gpt:
+        #print(clusterd_df[output_clm].tolist()[:3])
+        summarized_feats = summarize_style_feats(clusterd_df[output_clm].tolist())
+        clusterd_df[output_clm] = summarized_feats
+        #print(clusterd_df[output_clm].tolist()[:3])
+        
     return clusterd_df
     
     
