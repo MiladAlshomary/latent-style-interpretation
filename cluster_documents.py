@@ -4,7 +4,6 @@ import warnings
 import json
 import pickle as pkl
 from collections import Counter, defaultdict
-import spacy
 import math
 
 import numpy as np

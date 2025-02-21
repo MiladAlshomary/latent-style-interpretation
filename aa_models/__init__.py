@@ -16,6 +16,11 @@ def get_model(model, device=None, model_path=None):
 
         return LUAR_PAUSIT(device)
 
+    if model == "datadreamer-lora":
+        from datadreamer_lora import SIV_DataDreamer_LoRA
+
+        return SIV_DataDreamer_LoRA()
+
     elif model == "luar-mud":
         from luar_mud import LUAR_MUD
 

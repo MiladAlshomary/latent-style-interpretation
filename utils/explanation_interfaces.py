@@ -46,8 +46,7 @@ exp_interface_1="""
 #############################################
 
 exp_interface_1_1="""
-<p><strong>The Mystery Author can be described as having the following styles:</strong></p>
-<p><strong>For each style, we show how much it applies for each of the other candidate authors (higher score == more applicability and lower score == less applicability)</strong>. According to this analysis, our AI model made the recommendation below</p>
+<p><strong>The following is a selection of writing style descriptions that our system identified in the text. For each style, we show how much it applies to each of the authors (higher score == more applicability and lower score == less applicability). The lowest score is 0, and the highest is +1. According to this analysis, our AI model made the recommendation below</strong></p>
 <p><strong>Style 1:</strong></p>
 <p><span style="font-size: 16px; font-family: Helvetica;"><em>[style-1]</em></span></p>
 <table style="width: 80%; background-color: rgb(209, 209, 209);border: none;">
@@ -152,13 +151,14 @@ exp_interface_1_1="""
 </table>
 <p><br><hr></p>
 
+
 """
 
 ###########################################
 
 exp_interface_2="""
-<p><strong>The following is a selection of writing style features our system identified in the text and how much they apply for each of the authors</strong> (darker green == the feature strongly applies in the author's text, and lighter green == the feature applies less in the author's text)</p>
-Similar authors have similar applicability across various writing style features. In other words, their columns will have a similar color pattern across the different style features. According to this analysis, our AI model made the recommendation below
+<p><strong>The following is a selection of writing style features our system identified in the text and how much they apply for each of the authors</strong> (Green == the feature strongly applies in the author's text, and Red == the feature applies less in the author's text, and the transition between implies varying degrees of applicability)</p>
+Similar authors have similar applicability across the writing style features. In other words, their columns will have a similar color pattern across the different style features. According to this analysis, our AI model made the recommendation below
 <p><br></p>
 <table style='"width:70%";'>
     <tbody>
@@ -172,5 +172,6 @@ Similar authors have similar applicability across various writing style features
         [table-body]
     </tbody>
 </table>
+
 
 """

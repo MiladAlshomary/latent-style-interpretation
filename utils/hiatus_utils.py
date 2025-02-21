@@ -89,8 +89,9 @@ def build_explanation_interface1(explanation_interf, sim_to_styles, style_reps_s
 
 def get_color_gradient(input_list):
     start_color = '#90EE90'
+    #start_color = '#ff0000'
     end_color = '#013220'
-    
+    #end_color = '#008000'
     # Instantiate the gradient generator, opacity is optional (only used for KML)
     gg = Gradient(gradient_start=start_color, gradient_end=end_color, opacity=1.0)
     return gg.get_gradient_series(series=input_list, fmt='html')
@@ -107,9 +108,10 @@ def build_explanation_interface2(explanation_interf, query_author_style_feats, c
     #normalize feature weights to scale from 0 to 128   
     feature_weights = [[author[idx] for author in [query_author_style_feats] + candidate_authors_style_feats] for f, idx in selected_feats.items()]
     #log-scale values?
+    print(feature_weights[0])
     feature_weights = [np.log(x) for x in feature_weights]
     feature_weights_color = [get_color_gradient(x) for x in feature_weights]
-    
+    print(feature_weights[0])
     cell_template = """
         <tr>
             <td style="width: 30%; background-color: rgb(209, 213, 216);">[feat-name]</td>

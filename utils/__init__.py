@@ -4,7 +4,6 @@ import ast
 import random
 from collections import Counter
 
-import spacy
 import Levenshtein
 import numpy as np
 #import plotly.colors as pc
@@ -13,7 +12,6 @@ import numpy as np
 from tqdm import tqdm
 from tabulate import tabulate
 from nltk.corpus import wordnet as wn
-from spacy.matcher import Matcher
 import math
 from collections import Counter, defaultdict
 
@@ -805,6 +803,10 @@ def word_difference(sentence1, sentence2):
 
 
 def is_sentence_finished(sentence):
+    import spacy
+    from spacy.matcher import Matcher
+
+
     def is_valid_word(word):
         return bool(wn.synsets(word))
 

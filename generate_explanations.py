@@ -191,6 +191,10 @@ def explain_model_prediction_over_author(model_path, inter_space_path, inter_spa
     c_author_latents = [model.encode(c_author) for c_author in candidate_authors]
     c_author_interps = [[proj_matrix.dot(e/np.linalg.norm(e)) for e in documents_latent] for documents_latent in c_author_latents]
 
+    # Convert cosine similarity to angular similarity (ranges from 0 to 1)
+    q_author_interps = [1 - (np.arccos(cos_sim) / np.pi) for cos_sim in q_author_interps]
+    c_author_interps = [[1- (np.arccos(cos_sim) / np.pi) for cos_sim in c_author_interp] for c_author_interp in c_author_interps]
+    
     # Author representations as an average of their documents
     q_author_latent_avg  = np.mean(q_author_latents, axis=0)
     q_author_interp_avg  = np.mean(q_author_interps, axis=0)
@@ -208,19 +212,19 @@ def explain_model_prediction_over_author(model_path, inter_space_path, inter_spa
     c_author_rep_documents = [np.argmax(x) for x in c_cos_sims]
     
 
-    # Compute Model's latent and interp prediction as the pairwise cosine similarity over their documents' representations
+    # Option 1: Compute Model's latent and interp prediction as the pairwise cosine similarity over their documents' representations
     # latent_similarities = [np.mean(cosine_similarity(q_author_latents, c_latent)) for c_latent in c_author_latents]
     # interp_similarities = [np.mean(cosine_similarity(q_author_interps, c_interp)) for c_interp in c_author_interps]
     # model_latent_rank = np.argsort(latent_similarities)[::-1]
     # model_interp_rank = np.argsort(interp_similarities)[::-1]
 
-    # Compute Model's latent and interp prediction as the cosine similarity over their most representative documents
+    # Option 2: Compute Model's latent and interp prediction as the cosine similarity over their most representative documents
     # latent_similarities = [np.mean(cosine_similarity([q_author_latents[q_author_rep_document]], [c_latent[c_author_rep_documents[i]]])) for i, c_latent in enumerate(c_author_latents)]
     # interp_similarities = [np.mean(cosine_similarity([q_author_interps[q_author_rep_document]], [c_interp[c_author_rep_documents[i]]])) for i, c_interp in enumerate(c_author_interps)]
     # model_latent_rank = np.argsort(latent_similarities)[::-1]
     # model_interp_rank = np.argsort(interp_similarities)[::-1]
     
-    # Compute Model's latent and interp prediction as the cosine similarity over their average representations
+    # Option 3: Compute Model's latent and interp prediction as the cosine similarity over their average representations
     latent_similarities = cosine_similarity([q_author_latent_avg], c_author_latent_avgs)[0]
     interp_similarities = cosine_similarity([q_author_interp_avg], c_author_interp_avgs)[0]
     model_latent_rank = np.argsort(latent_similarities)[::-1]
