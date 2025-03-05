@@ -108,10 +108,8 @@ def build_explanation_interface2(explanation_interf, query_author_style_feats, c
     #normalize feature weights to scale from 0 to 128   
     feature_weights = [[author[idx] for author in [query_author_style_feats] + candidate_authors_style_feats] for f, idx in selected_feats.items()]
     #log-scale values?
-    print(feature_weights[0])
     feature_weights = [np.log(x) for x in feature_weights]
     feature_weights_color = [get_color_gradient(x) for x in feature_weights]
-    print(feature_weights[0])
     cell_template = """
         <tr>
             <td style="width: 30%; background-color: rgb(209, 213, 216);">[feat-name]</td>

@@ -88,9 +88,9 @@ def compute_model_performance(embed_model, df, proj_matrix):
 
         row_num+=1
         
-    return (
+    return [
         round(np.mean(eer_interp), 3),
         round(np.mean(prec_interp), 3),
         round(np.mean(ndcg_interp), 3),
         round(np.mean(interp_documents_pairwise_sims), 3),
-    )
+    ]

@@ -17,6 +17,7 @@ from utils import find_first_minimal_change, safe_parse
 from metrics import compute_model_performance, compute_intrinsic_clusters_score
 from aa_models import get_model
 from styles import StyleGenerator
+from tabulate import tabulate
 
 warnings.filterwarnings("ignore")
 
@@ -70,7 +71,7 @@ def main(args):
         eps_to_labels = {}
         
         for eps in tqdm(
-            np.arange(0.01, 1, 0.01),
+            np.arange(0.01, 0.3, 0.01),
             ascii=True,
             desc="Testing Different Epsilon Values",
             leave=False,
@@ -91,19 +92,22 @@ def main(args):
             )
     
             eps_to_performance[eps] = compute_model_performance(model, test_df, new_bases)
-            eps_to_performance[eps] = [eps_to_performance[eps], len(new_bases)]
+            eps_to_performance[eps] = eps_to_performance[eps] + [sil_score, dbcv_score, len(new_bases)]
             eps_to_labels[eps] = cluster_labels
-    
+
             print(eps_to_performance[eps] + [sil_score, dbcv_score], round(eps, 3))
 
         #json.dump(eps_to_performance, open('./eps_performances.json', 'w'))
         best_eps = sorted(eps_to_performance.items(), key=lambda x: x[1][0])[0][0]#find_first_minimal_change(eps_to_performance, args["eps_threshold"])
         train_df_by_author["cluster_label"] = eps_to_labels[best_eps]
 
-        return best_eps, train_df_by_author
+        return best_eps, train_df_by_author, eps_to_performance
 
     if args['eps'] == -1:
-        best_eps, train_df_by_author = find_best_eps()
+        best_eps, train_df_by_author, eps_to_performance = find_best_eps()
+        print(tabulate([[x[0], x[1][0], x[1][1], x[1][3], x[1][4], x[1][6]] for x in eps_to_performance.items()], 
+                       headers=['Eps', 'EER', 'Prec', 'Sim', 'Silhouette', '#clusters']))
+
     else:
         best_eps = args['eps']
 
@@ -121,7 +125,7 @@ def main(args):
         )
 
         train_df_by_author["cluster_label"] = cluster_labels
-        
+        train_df_by_author["author_embedding"] = train_df_by_author.authorID.apply(lambda x: author_to_embeddings[x])
 
     
     if not os.path.exists(args["save_dir"]):
