@@ -131,13 +131,14 @@ class OpenAIModel:
                 json.load(
                     open(os.path.join(os.path.dirname(__file__), "keys.json"), "r")
                 )
-            )
+            ),
         )
 
         args = Munch.fromYAML(
             open(os.path.join(os.path.dirname(__file__), "config.yaml"), "r")
         )
 
+        client.base_url = args.base_url
         self.model = model_name
         self.num_processes = args.num_processes
 

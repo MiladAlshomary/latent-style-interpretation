@@ -1,0 +1,3 @@
+num_processes: 10
+base_url: http://localhost:9977/v1
+top_p: 0.2

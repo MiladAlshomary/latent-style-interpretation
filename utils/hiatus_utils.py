@@ -18,7 +18,10 @@ from utils import explanation_interfaces
 def get_hrs_data(input_path, num_instances=10, random_seed=123):
     all_df, queries_df, candidates_df = get_aa_data_from_original_format(input_path + '/data/hrs2_09-24-24_english_crossGenre-combined_TA2_input', 
                                                                          input_path + '/groundtruth/hrs2_09-24-24_english_crossGenre-combined_TA2')
-    for idx, row in queries_df.sample(num_instances, random_state=random_seed).iterrows():
+    
+    #queries_df_sample = queries_df.sample(num_instances, random_state=random_seed)
+    queries_df_sample = queries_df[:num_instances]
+    for idx, row in queries_df_sample.iterrows():
     
         # Get the query author's documents
         query_author_df   = queries_df[queries_df.authorID == row['authorID']]
@@ -74,6 +77,8 @@ def build_explanation_interface1(explanation_interf, sim_to_styles, style_reps_s
         random.shuffle(style_reps_summ)
     
     for i, s in enumerate(style_reps_summ):
+        if type(s) == list:
+            s = ' - '.join(s)
         explanation_tmp = explanation_tmp.replace('[style-{}]'.format(i+1), s)
 
     for s_id, value in enumerate(style_reps_summ):

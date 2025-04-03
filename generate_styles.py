@@ -64,7 +64,7 @@ def main(args):
         + ".csv"
     )
 
-    if not os.path.exists(save_dir):
+    if args["force_generation"] or not os.path.exists(save_dir):
         output_df = style_generator.describe_documents_writing_styles(
             training_df.documentID.tolist(), training_df.fullText.tolist()
         )
@@ -93,7 +93,7 @@ def main(args):
         max_new_tokens=args["max_new_tokens"],
     )
 
-    if not os.path.exists(save_dir):
+    if args["force_generation"] or not os.path.exists(save_dir):
         # Shorten generated style descriptions
         style_corpus = process_style_features(
             style_shortener,
@@ -118,25 +118,28 @@ def main(args):
     print("Done.")
 
     ### THIRD: WE FILTER OUT FEATURES THAT APPEAR LESS THAN 3 TIMES IN THE CORPUS ###############################
-    print("Filtering shortened styles... ", end="")
+    print("Removing features that appear less than N times ", end="")
     save_dir = os.path.join(
         os.path.dirname(args["data_dir"]), "filtered", "style_corpus_filtered.csv"
     )
 
-    if not os.path.exists(save_dir):
+    if args["force_generation"] or not os.path.exists(save_dir):
         feat_to_document_df = (
             style_corpus.groupby("shortend_attribute_name.v2")
             .agg({"documentID": lambda x: len(list(x))})
             .reset_index()
         )
+        print("Number of documents: ", " >>>>>>>>> ", style_corpus.documentID.nunique())
         # Keep features with minimum frequency
-        feats_with_3_minimum_freq = feat_to_document_df[
+        feats_with_minimum_freq = feat_to_document_df[
             feat_to_document_df.documentID > args["style_threshold"]
         ]["shortend_attribute_name.v2"].tolist()
         filtered_df = style_corpus[
-            style_corpus["shortend_attribute_name.v2"].isin(feats_with_3_minimum_freq)
+            style_corpus["shortend_attribute_name.v2"].isin(feats_with_minimum_freq)
         ]
 
+        print("Number of documents after removing infrequent feats: ", " >>>>>>>>> ", filtered_df.documentID.nunique())
+        print("Keeping only {} features".format(len(feats_with_minimum_freq)))
         if not os.path.exists(os.path.dirname(save_dir)):
             os.makedirs(os.path.dirname(save_dir))
 
@@ -146,14 +149,15 @@ def main(args):
     print("Done.")
 
     filtered_df.dropna(inplace=True)
-
+    print("Number of documents after dropna ", " >>>>>>>>> ", filtered_df.documentID.nunique())
     ### FOURTH: WE AGGREGATE SIMILAR FEATURES USING MIS MEASURE ###############################
     save_dir = os.path.join(
         os.path.dirname(args["data_dir"]),
         "filtered",
         "refined_and_aggregated_features.csv",
     )
-    if not os.path.exists(save_dir):
+    
+    if args["force_generation"] or not os.path.exists(save_dir):
         mis = MIS(device=f'cuda:{args["device"][0]}')
 
         filtered_df["shortend_attribute_name.v2"] = filtered_df[
@@ -185,7 +189,9 @@ def main(args):
         "refined_and_aggregated_features_final.csv",
     )
     
-    if not os.path.exists(save_dir):
+    if args["force_generation"] or not os.path.exists(save_dir):
+        print("Number of documents", " >>>>>>>>> ", filtered_df.documentID.nunique())
+        print("Number of features", " >>>>>>>>> ", filtered_df.aggregated_name.nunique())
         unique_attributes = filtered_df.aggregated_name.unique()
         attribute_to_patterns = {x: get_np(x) for x in unique_attributes}
         filtered_df["extracted-phrases"] = filtered_df.aggregated_name.apply(
@@ -214,6 +220,22 @@ def main(args):
             ],
         )
 
+        # Again filter out infrequent features
+        feat_to_document_df = (
+            expanded_df.groupby("final_attribute_name")
+            .agg({"documentID": lambda x: len(list(x))})
+            .reset_index()
+        )
+        feats_with_minimum_freq = feat_to_document_df[
+            feat_to_document_df.documentID > args["style_threshold"]
+        ]["final_attribute_name"].tolist()
+        expanded_df = expanded_df[
+            expanded_df["final_attribute_name"].isin(feats_with_minimum_freq)
+        ]
+
+        print("Number of documents after processing", " >>>>>>>>> ", expanded_df.documentID.nunique())
+        print("Number of features after processing", " >>>>>>>>> ", expanded_df.aggregated_name.nunique())
+        
         expanded_df.to_csv(save_dir, index=False)
     else:
         expanded_df = pd.read_csv(save_dir)
@@ -222,7 +244,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=str)
     parser.add_argument("--device", type=int, nargs="+")
-    parser.add_argument("--max-new-tokens", type=int, default=512)
+    parser.add_argument("--max-new-tokens", type=int, default=1000)
     parser.add_argument("--datadreamer_path", type=str, default='./datadreamer')
     parser.add_argument(
         "--generator-model",
@@ -234,6 +256,7 @@ if __name__ == "__main__":
             "openai:gpt-3.5-turbo",
             "openai:gpt-4",
             "openai:gpt-4o",
+            "openai:deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
         ],
     )
     parser.add_argument(
@@ -246,8 +269,11 @@ if __name__ == "__main__":
             "openai:gpt-3.5-turbo",
             "openai:gpt-4",
             "openai:gpt-4o",
+            "openai:deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
         ],
     )
     parser.add_argument("--style-threshold", type=int, default=2)
+    parser.add_argument("--force-generation", action='store_true', default=False)
     args = vars(parser.parse_args())
+    print(args)
     main(args)

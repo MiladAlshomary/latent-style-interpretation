@@ -14,10 +14,12 @@ from huggingface_hub import login
 from sklearn.cluster import DBSCAN
 from datadreamer import DataDreamer
 from datadreamer.steps import ProcessWithPrompt, DataSource, zipped, concat
+from munch import Munch
 
 from utils import (
     gen_from_iterable_dataset,
     extract_feats,
+    extract_feats_deepseek,
     word_difference,
     column,
     merge_sublists,
@@ -72,6 +74,10 @@ class StyleGenerator:
         # Load keys
         self.keys = json.load(open(os.path.join(current_dir, "..", "keys-local.json"), "r"))
 
+        self.args = Munch.fromYAML(
+            open(os.path.join(current_dir, "..", "config.yaml"), "r")
+        )
+        
         # Authenticate HuggingFace to access gated models
         login(self.keys["huggingface"])
 
@@ -96,6 +102,7 @@ class StyleGenerator:
         self.style_features_folder = style_features_folder
 
         self.max_new_tokens = max_new_tokens
+        self.top_p = self.args.top_p
 
     def generate_styled_documents(self, num_instances, topics=None):
         """
@@ -440,6 +447,7 @@ class StyleGenerator:
                 args={
                     "llm": self.model,
                     "n": 1,
+                    "top_p": self.top_p,
                     "max_new_tokens": self.max_new_tokens,
                     "instruction": self.prompts["describe_documents_writing_styles"][
                         "instruction"
@@ -449,7 +457,7 @@ class StyleGenerator:
             ).select_columns(["generations"])
 
             ds_desc = ds_desc.map(
-                lambda row: {"style_description": extract_feats(row["generations"])}
+                lambda row: {"style_description": extract_feats_deepseek(row["generations"])}
             )
             
             ds_desc = ds_desc.map(
@@ -506,12 +514,25 @@ class StyleGenerator:
                 args={
                     "llm": self.model,
                     "n": 1,
+                    "top_p": self.top_p,
                     "max_new_tokens": self.max_new_tokens,
                     "instruction": instruction,
                 },
                 outputs={"generations": "generations"},
             ).select_columns(["generations"])
 
+            def extract_shortend_sents(generation):
+                if '</think>' in generation:
+                    generation = generation.split('</think>')[-1].strip()
+                else:
+                    generation = "This is generic sentence"
+
+                return generation
+
+            ds_desc = ds_desc.map(
+                lambda row: {"generations": extract_shortend_sents(row["generations"])}
+            )
+            
             zipped_step = zipped(ds, ds_desc)
             datasets_list.append(zipped_step)
 

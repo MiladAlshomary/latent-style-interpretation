@@ -2,6 +2,8 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import average_precision_score, roc_curve, ndcg_score
 from sklearn.metrics import silhouette_score
+from scipy import stats
+
 #import dbcv
 
 
@@ -53,6 +55,8 @@ def compute_model_performance(embed_model, df, proj_matrix):
     
     # Compute performance metrics
     interp_documents_pairwise_sims = cosine_similarity(interp_embeddings, interp_embeddings)
+
+    latent_documents_pairwise_sims = cosine_similarity(documents_embeddings, documents_embeddings)
     
     index_to_author_id = {i: x for i, x in enumerate(df.authorID.tolist())}
     # print(interp_documents_pairwise_sims)
@@ -61,8 +65,12 @@ def compute_model_performance(embed_model, df, proj_matrix):
     
     prec_interp = []
     eer_interp = []
-    ndcg_interp = []
 
+    prec_latent = []
+    eer_latent = []
+
+    person_corr = []
+    
     row_num = 0
     for index, row in df.iterrows():
         author_id = row["authorID"]
@@ -72,25 +80,39 @@ def compute_model_performance(embed_model, df, proj_matrix):
             for i, a_id in index_to_author_id.items()
             if i != row_num
         ]
+        
         y_interp_score = [
             interp_documents_pairwise_sims[row_num][i]
             for i, a_id in index_to_author_id.items()
             if i != row_num
         ]
 
+        y_latent_score = [
+            latent_documents_pairwise_sims[row_num][i]
+            for i, a_id in index_to_author_id.items()
+            if i != row_num
+        ]
+
         prec_interp.append(average_precision_score(y_true, y_interp_score))
+        prec_latent.append(average_precision_score(y_true, y_latent_score))
         try:
             eer_interp.append(compute_eer(y_true, y_interp_score))
+            eer_latent.append(compute_eer(y_true, y_latent_score))
         except ValueError:
+            print('Error computing ERR')
             eer_interp.append(1)
+            eer_latent.append(1)
 
-        ndcg_interp.append(ndcg_score([y_true], [y_interp_score]))
-
+        res = stats.pearsonr(y_interp_score, y_latent_score)
+        person_corr.append(res.statistic)
+    
         row_num+=1
+
+    eer_interp  = np.mean(eer_interp) - np.mean(eer_latent)
+    prec_interp = np.mean(prec_latent) - np.mean(prec_interp)
         
     return [
-        round(np.mean(eer_interp), 3),
-        round(np.mean(prec_interp), 3),
-        round(np.mean(ndcg_interp), 3),
-        round(np.mean(interp_documents_pairwise_sims), 3),
+        round(eer_interp, 3),
+        round(prec_interp, 3),
+        round(np.mean(person_corr), 3)
     ]

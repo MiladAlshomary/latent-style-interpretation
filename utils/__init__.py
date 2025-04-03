@@ -14,7 +14,7 @@ from tabulate import tabulate
 from nltk.corpus import wordnet as wn
 import math
 from collections import Counter, defaultdict
-
+import spacy
 
 # Load the spaCy model
 nlp = None
@@ -154,7 +154,7 @@ def extract_feats(desc):
             print(paras[i])
             continue
 
-        category = re.sub(r"\*\*", "", paras[i]).strip().replace(":", "")
+        category = re.sub(r"\*\*", "", paras[i]).strip().replace(":", "").replace("### ", "")
         features = [
             f.replace("-", "").replace("*", "").strip()
             for f in paras[i + 1].split("\n")
@@ -167,6 +167,47 @@ def extract_feats(desc):
 
     return output
 
+def extract_feats_deepseek(desc):
+    """
+    Extract writing style features from the given description.
+
+    Parameters:
+        desc (str): Description text containing writing style attributes.
+
+    Returns:
+        dict: Dictionary containing extracted features for each writing style level.
+    """
+    output = {
+        "Morphological Level": ["other"],
+        "Syntactic Level": ["other"],
+        "Semantic Level": ["other"],
+        "Discourse Level": ["other"],
+    }
+
+    # For generation of DeepSeek we need to split over </think> tag and remove it
+    desc = desc.split('</think>')[-1].strip()
+    
+    paras = desc.split("\n\n")
+
+    if not paras:
+        return output
+
+    for i in range(0, len(paras), 2):
+        if i + 1 >= len(paras):
+            print('Skipping paragraph')
+            print(paras[i])
+            continue
+
+        category = re.sub(r"[^\w\s]", "", paras[i]).strip()
+        features = [
+            f.replace("-", "").replace("*", "").strip()
+            for f in paras[i + 1].split("\n")
+        ]
+
+        if category in output:
+            output[category] = features
+
+    return output
 
 def find_first_minimal_change(data, threshold):
     """
@@ -744,7 +785,8 @@ def get_np(text):
     global nlp
     if nlp == None:
         nlp = spacy.load("en_core_web_sm")
-
+    from spacy.matcher import Matcher
+    
     matcher = Matcher(nlp.vocab)
     patterns = [
         [{"POS": "ADJ"}, {"POS": "NOUN", "OP": "+"}, {"POS": "ADV", "OP": "?"}],
@@ -765,6 +807,10 @@ def get_np(text):
             continue
         final_output.append(item)
 
+    # If no noun-phrases found then just use the original feature.
+    if len(final_output) == 0:
+        final_output.append(text)
+        
     return final_output
 
 
@@ -806,6 +852,8 @@ def is_sentence_finished(sentence):
     import spacy
     from spacy.matcher import Matcher
 
+    if sentence == '':
+        return False
 
     def is_valid_word(word):
         return bool(wn.synsets(word))

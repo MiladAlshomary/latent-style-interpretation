@@ -6,6 +6,7 @@ import torch
 from transformers import QuantoConfig
 from transformers import BitsAndBytesConfig
 from datadreamer.llms import HFTransformers, ParallelLLM, OpenAI
+from munch import Munch
 
 from utils import check_model_name_format
 
@@ -58,15 +59,19 @@ def get_datadreamer_backbone(model_name, device):
             )
 
     elif "openai" in model_name:
+        args = Munch.fromYAML(
+            open(os.path.join(os.path.dirname(__file__), "../config.yaml"), "r")
+        )
+        
         api_key = json.load(
             open(os.path.join(os.path.dirname(__file__), "../keys.json"), "r")
         )["openai"]
-
+        
         # Check formats and OpenAI API key is properly initialized
         check_model_name_format(model_name)
         assert api_key != ""
-
-        return OpenAI(model_name=model_name.split(":")[-1], api_key=api_key)
+        print('Connecting to openai url {}'.format(args.base_url))
+        return OpenAI(model_name=model_name.split(":")[-1], api_key=api_key, base_url=args.base_url)
 
 
 def get_model(model_name):
