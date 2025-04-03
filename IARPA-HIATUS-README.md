@@ -61,43 +61,13 @@ Now, given the interpretable_space.pkl and its style representation interpretabl
 
 
 ## Requirements
-Install the necessary libraries using the provided `requirements.txt`:
+
+Create your conda enviornment from gpu-env-file.txt:
 ```
-pip install -r requirements.txt
-```
-Alternatively, you can manually install them:
-```
-pandas
-mutual-implication-score
-spacy
-python-levenshtein
-numpy
-plotly
-tqdm
-nltk
-scikit-learn
-datasets
-huggingface-hub
-datadreamer
-torch
-transformers
-ollama
-openai
-munch
+conda create --name myenv --file gpu-env-file.txt
 ```
 
-## Notes
- - An example dataset is provided in `datasets/example_data.jsonl`. Please follow this format.
-
-### Style Generator
- - Setting `style-threshold` too low for small datasets may result in an empty filtered style description list.
- - The style generation and shortening steps use `llama3-8b` by default. To change the model, specify it with the `--generator-model` and `--shortener-model` arguments (see DOCSTRING in `generate_styles.py`).
- - Ensure your HuggingFace API key and OpenAI API key are included in `keys.json` and `backbones/openai_gpt/keys.json`.
-
-### Clustering (POI Identification)
-- The default clustering method used is DBSCAN with cosine dissimilarity as the metric.
-- Points of Interest (POIs) are identified by iterating through a range of $\epsilon$ values for DBSCAN and selecting the value where the performance gain is minimal across all metrics (EER, AP, NDCG). The default range is 0.01 to 2 with a step size of 0.01.
-- Using a train and test dataset that is too small may result in degenerate clustering outcomes due to the nature of DBSCAN.
-
-### Generating style explanations for documents
-- Generate explanations for the style of documents
+Install the necessary libraries using the provided `gpu-env-pip-requirements.txt`:
+```
+pip install -r gpu-env-pip-requirements.txt
+```

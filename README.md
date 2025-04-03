@@ -9,6 +9,12 @@ python generate_styles.py --data-dir datasets/example_data.jsonl
                           --max-new-tokens 512 
                           --device 2 
 ```
+
+The output of this command would generate "filtered/refined_and_aggregated_features_final.csv" inside the data-dir where each row contains a writing style feature and the corresponding documentID it appears in.
+
+We ran this command to generate writing style for our HRS corpus using DeepSeek and the results can be explored in src-ipynb/generate_styles_w_deepseek.ipynb
+
+
 Example usage for clustering:
 ```
 python cluster_documents.py --train-dir datasets/example_data.jsonl 
